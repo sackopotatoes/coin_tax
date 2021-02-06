@@ -1,0 +1,8 @@
+[package]
+name = "coin_tax"
+version = "0.1.0"
+authors = ["sackopotatoes <>"]
+edition = "2018"
+
+[dependencies]
+chrono = "0.4"
