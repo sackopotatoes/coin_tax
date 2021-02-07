@@ -22,9 +22,7 @@ where P: AsRef<Path>, {
     Ok(io::BufReader::new(file).lines().enumerate())
 }
 
-
-
-pub fn run(filename: &str) -> Result<(), Box<dyn Error>> {
+pub fn run(filename: &str, exchange: &str) -> Result<(), Box<dyn Error>> {
     let mut transactions: Vec<transaction::Transaction> = Vec::new();
     let mut coins = HashSet::new();
 
@@ -38,7 +36,7 @@ pub fn run(filename: &str) -> Result<(), Box<dyn Error>> {
         }
 
         if let Ok(ip) = line {
-          let transaction = transaction::create_transaction_from_line(&ip)?;
+          let transaction = transaction::create_transaction_from_line(&ip, &exchange)?;
 
           if !coins.contains(&transaction.asset) {
             coins.insert(transaction.asset.clone());

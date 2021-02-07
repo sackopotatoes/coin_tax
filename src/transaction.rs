@@ -19,7 +19,8 @@ pub(crate) struct Transaction {
   pub(crate) action: TransactionType,
   pub(crate) asset: String,
   pub(crate) quantity: f64,
-  pub(crate) price: f64
+  pub(crate) price: f64,
+  pub(crate) conversion_to: Option<String>
 }
 
 #[derive(Error, Debug, PartialEq)]
@@ -80,6 +81,19 @@ fn get_price_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, T
   }
 }
 
+fn get_conversion_to_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<Option<String>, TransactionError> {
+    match exchange {
+    "coinbase" => {
+      let note_data: Vec<&str> = line_data.last().unwrap().split(" ").collect::<Vec<&str>>();
+
+      Ok(Some(String::from(*note_data.last().unwrap())))
+    },
+    _ => Err(TransactionError::UnsupportedExchange)
+  }
+}
+
+
+
 fn split_string(string: &str, delimeter: Option<char>) -> Vec<&str> {
   string.split(delimeter.unwrap_or(',')).collect()
 }
@@ -88,22 +102,27 @@ fn split_csv_line(line: &str) -> Vec<&str> {
   split_string(&line, None)
 }
 
-pub(crate) fn create_transaction_from_line(line: &str) -> Result<Transaction, Box<dyn Error>> {
+pub(crate) fn create_transaction_from_line(line: &str, exchange: &str) -> Result<Transaction, Box<dyn Error>> {
   let split_line = split_csv_line(line);
 
-  //TODO: allow the indices to be keyed off exchange type
-  let timestamp = get_timestamp_by_exchange(&split_line, "coinbase")?;
-  let action = get_action_by_exchange(&split_line, "coinbase")?;
-  let asset = get_asset_by_exchange(&split_line, "coinbase")?;
-  let quantity = get_quantity_by_exchange(&split_line, "coinbase")?;
-  let price = get_price_by_exchange(&split_line, "coinbase")?;
+  let timestamp = get_timestamp_by_exchange(&split_line, &exchange)?;
+  let action = get_action_by_exchange(&split_line, &exchange)?;
+  let asset = get_asset_by_exchange(&split_line, &exchange)?;
+  let quantity = get_quantity_by_exchange(&split_line, &exchange)?;
+  let price = get_price_by_exchange(&split_line, &exchange)?;
+  let mut conversion_to = None;
+
+  if action == TransactionType::Convert {
+    conversion_to = get_conversion_to_by_exchange(&split_line, &exchange)?;
+  }
 
   Ok(Transaction {
     timestamp,
     action,
     asset,
     quantity,
-    price
+    price,
+    conversion_to
   })
 }
 
@@ -194,6 +213,16 @@ mod tests {
   }
 
   #[test]
+  fn test_get_conversion_to_by_exchange() {
+    let test_data = vec!["2021-01-31T05:20:47Z","Convert","XLM","1641.4065951","0.310000","505.34","515.01","9.67","Converted 1,641.4065951 XLM to 774.762752 ALGO"];
+    let expected_result = Some(String::from("ALGO"));
+
+    let my_conversion_to = get_conversion_to_by_exchange(&test_data, "coinbase").unwrap();
+
+    assert_eq!(my_conversion_to, expected_result);
+  }
+
+  #[test]
   fn test_split_string() {
       let expected_result = vec!["this", "is", "a", "test", "string"];
       let test_string = "this,is,a,test,string";
@@ -231,10 +260,11 @@ mod tests {
       action: TransactionType::Buy,
       asset: String::from("BTC"),
       quantity: 0.000919,
-      price: 10.00
+      price: 10.00,
+      conversion_to: None
     };
 
-    let transaction = create_transaction_from_line(&test_string).unwrap();
+    let transaction = create_transaction_from_line(&test_string, "coinbase").unwrap();
 
     assert_eq!(transaction.timestamp, expected_result.timestamp);
     assert_eq!(transaction.action, expected_result.action);
