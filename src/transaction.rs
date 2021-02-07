@@ -22,12 +22,16 @@ pub(crate) struct Transaction {
   pub(crate) price: f64
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum TransactionError {
   #[error("Unknown Action")]
   UnknownAction,
   #[error("Exchange not yet supported!")]
-  UnsupportedExchange
+  UnsupportedExchange,
+  #[error(transparent)]
+  TimeParseError(#[from] chrono::ParseError),
+  #[error(transparent)]
+  FloatParseError(#[from] std::num::ParseFloatError)
 }
 
 fn get_coinbase_action(raw_action: &str) -> Result<TransactionType, TransactionError> {
@@ -41,38 +45,38 @@ fn get_coinbase_action(raw_action: &str) -> Result<TransactionType, TransactionE
   }
 }
 
-fn get_action_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<TransactionType, Box<dyn Error>> {
+fn get_action_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<TransactionType, TransactionError> {
   match exchange {
     "coinbase" => Ok(get_coinbase_action(line_data[1])?),
-    _ => Err(Box::new(TransactionError::UnsupportedExchange))
+    _ => Err(TransactionError::UnsupportedExchange)
   }
 }
 
-fn get_timestamp_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<i64, Box<dyn Error>> {
+fn get_timestamp_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<i64, TransactionError> {
   match exchange {
-    "coinbase" => Ok(DateTime::parse_from_rfc3339(line_data[0]).unwrap().timestamp_millis()),
-    _ => Err(Box::new(TransactionError::UnsupportedExchange))
+    "coinbase" => Ok(DateTime::parse_from_rfc3339(line_data[0])?.timestamp_millis()),
+    _ => Err(TransactionError::UnsupportedExchange)
   }
 }
 
-fn get_asset_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<String, Box<dyn Error>> {
+fn get_asset_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<String, TransactionError> {
   match exchange {
     "coinbase" => Ok(String::from(line_data[2])),
-    _ => Err(Box::new(TransactionError::UnsupportedExchange))
+    _ => Err(TransactionError::UnsupportedExchange)
   }
 }
 
-fn get_quantity_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, Box<dyn Error>> {
+fn get_quantity_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, TransactionError> {
   match exchange {
     "coinbase" => Ok(f64::from_str(line_data[3])?),
-    _ => Err(Box::new(TransactionError::UnsupportedExchange))
+    _ => Err(TransactionError::UnsupportedExchange)
   }
 }
 
-fn get_price_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, Box<dyn Error>> {
+fn get_price_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, TransactionError> {
     match exchange {
     "coinbase" => Ok(f64::from_str(line_data[6])?),
-    _ => Err(Box::new(TransactionError::UnsupportedExchange))
+    _ => Err(TransactionError::UnsupportedExchange)
   }
 }
 
@@ -113,23 +117,44 @@ mod tests {
   }
 
   #[test]
-  fn test_get_action_by_exchange() {
-    let test_data = vec!["2018-01-23T03:40:11Z","Buy","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
-    let expected_result = TransactionType::Buy;
+  fn test_get_action_by_exchange() -> Result<(), Box<dyn Error>> {
+    let test_buy_data = vec!["2018-01-23T03:40:11Z","Buy","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let test_sell_data = vec!["2018-01-23T03:40:11Z","Sell","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let test_income_data = vec!["2018-01-23T03:40:11Z","Rewards Income","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let test_earn_data = vec!["2018-01-23T03:40:11Z","Coinbase Earn","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let test_convert_data = vec!["2018-01-23T03:40:11Z","Convert","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let test_unknown_data = vec!["2018-01-23T03:40:11Z","Unknown","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
 
-    let my_action = get_action_by_exchange(&test_data, "coinbase").unwrap();
+    let my_buy_action = get_action_by_exchange(&test_buy_data, "coinbase")?;
+    let my_sell_action = get_action_by_exchange(&test_sell_data, "coinbase")?;
+    let my_income_action = get_action_by_exchange(&test_income_data, "coinbase")?;
+    let my_earn_action = get_action_by_exchange(&test_earn_data, "coinbase")?;
+    let my_convert_action = get_action_by_exchange(&test_convert_data, "coinbase")?;
+    let my_unknown_action = get_action_by_exchange(&test_unknown_data, "coinbase").unwrap_err();
+    let my_unsupported_exchange = get_action_by_exchange(&test_buy_data, "coinfake").unwrap_err();
 
-    assert_eq!(my_action, expected_result);
+    assert_eq!(my_buy_action, TransactionType::Buy);
+    assert_eq!(my_sell_action, TransactionType::Sell);
+    assert_eq!(my_income_action, TransactionType::Income);
+    assert_eq!(my_earn_action, TransactionType::Income);
+    assert_eq!(my_convert_action, TransactionType::Convert);
+    assert_eq!(my_unknown_action, TransactionError::UnknownAction);
+    assert_eq!(my_unsupported_exchange, TransactionError::UnsupportedExchange);
+
+    Ok(())
   }
 
   #[test]
   fn test_get_timestamp_by_exchange() {
     let test_data = vec!["2018-01-23T03:40:11Z","Buy","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+
     let expected_result = 1516678811000;
 
     let my_timestamp = get_timestamp_by_exchange(&test_data, "coinbase").unwrap();
+    let my_unsupported_exchange = get_timestamp_by_exchange(&test_data, "coinfake").unwrap_err();
 
     assert_eq!(my_timestamp, expected_result);
+    assert_eq!(my_unsupported_exchange, TransactionError::UnsupportedExchange);
   }
 
   #[test]
@@ -138,8 +163,10 @@ mod tests {
     let expected_result = "BTC";
 
     let my_asset = get_asset_by_exchange(&test_data, "coinbase").unwrap();
+    let my_unsupported_exchange = get_asset_by_exchange(&test_data, "coinfake").unwrap_err();
 
     assert_eq!(my_asset, expected_result);
+    assert_eq!(my_unsupported_exchange, TransactionError::UnsupportedExchange);
   }
 
   #[test]
@@ -148,8 +175,10 @@ mod tests {
     let expected_result = 0.000919;
 
     let my_quantity = get_quantity_by_exchange(&test_data, "coinbase").unwrap();
+    let my_unsupported_exchange = get_quantity_by_exchange(&test_data, "coinfake").unwrap_err();
 
     assert_eq!(my_quantity, expected_result);
+    assert_eq!(my_unsupported_exchange, TransactionError::UnsupportedExchange);
   }
 
   #[test]
@@ -158,8 +187,10 @@ mod tests {
     let expected_result = 10.00;
 
     let my_price = get_price_by_exchange(&test_data, "coinbase").unwrap();
+    let my_unsupported_exchange = get_price_by_exchange(&test_data, "coinfake").unwrap_err();
 
     assert_eq!(my_price, expected_result);
+    assert_eq!(my_unsupported_exchange, TransactionError::UnsupportedExchange);
   }
 
   #[test]
