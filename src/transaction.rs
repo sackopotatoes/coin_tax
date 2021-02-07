@@ -2,6 +2,7 @@ use std::error::Error;
 use std::str::FromStr;
 
 use chrono::{DateTime};
+use thiserror::Error;
 
 #[derive(Debug)]
 #[derive(PartialEq)]
@@ -21,21 +22,57 @@ pub(crate) struct Transaction {
   pub(crate) price: f64
 }
 
-fn get_coinbase_action(raw_action: &str) -> Result<TransactionType, &'static str> {
+#[derive(Error, Debug)]
+pub enum TransactionError {
+  #[error("Unknown Action")]
+  UnknownAction,
+  #[error("Exchange not yet supported!")]
+  UnsupportedExchange
+}
+
+fn get_coinbase_action(raw_action: &str) -> Result<TransactionType, TransactionError> {
   match raw_action {
     "Buy" => Ok(TransactionType::Buy),
     "Sell" => Ok(TransactionType::Sell),
     "Rewards Income" => Ok(TransactionType::Income),
     "Coinbase Earn" => Ok(TransactionType::Income),
     "Convert" => Ok(TransactionType::Convert),
-    _ => Err("Unknown Action!")
+    _ => Err(TransactionError::UnknownAction)
   }
 }
 
-fn get_action_by_exchange(raw_action: &str, exchange: &str) -> Result<TransactionType, &'static str> {
+fn get_action_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<TransactionType, Box<dyn Error>> {
   match exchange {
-    "coinbase" => Ok(get_coinbase_action(raw_action)?),
-    _ => Err("Exchange not yet supported!")
+    "coinbase" => Ok(get_coinbase_action(line_data[1])?),
+    _ => Err(Box::new(TransactionError::UnsupportedExchange))
+  }
+}
+
+fn get_timestamp_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<i64, Box<dyn Error>> {
+  match exchange {
+    "coinbase" => Ok(DateTime::parse_from_rfc3339(line_data[0]).unwrap().timestamp_millis()),
+    _ => Err(Box::new(TransactionError::UnsupportedExchange))
+  }
+}
+
+fn get_asset_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<String, Box<dyn Error>> {
+  match exchange {
+    "coinbase" => Ok(String::from(line_data[2])),
+    _ => Err(Box::new(TransactionError::UnsupportedExchange))
+  }
+}
+
+fn get_quantity_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, Box<dyn Error>> {
+  match exchange {
+    "coinbase" => Ok(f64::from_str(line_data[3])?),
+    _ => Err(Box::new(TransactionError::UnsupportedExchange))
+  }
+}
+
+fn get_price_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, Box<dyn Error>> {
+    match exchange {
+    "coinbase" => Ok(f64::from_str(line_data[6])?),
+    _ => Err(Box::new(TransactionError::UnsupportedExchange))
   }
 }
 
@@ -51,11 +88,11 @@ pub(crate) fn create_transaction_from_line(line: &str) -> Result<Transaction, Bo
   let split_line = split_csv_line(line);
 
   //TODO: allow the indices to be keyed off exchange type
-  let timestamp = DateTime::parse_from_rfc3339(split_line[0])?.timestamp_millis();
-  let action = get_action_by_exchange(split_line[1], "coinbase")?;
-  let asset = String::from(split_line[2]);
-  let quantity = f64::from_str(split_line[3])?;
-  let price = f64::from_str(split_line[6])?;
+  let timestamp = get_timestamp_by_exchange(&split_line, "coinbase")?;
+  let action = get_action_by_exchange(&split_line, "coinbase")?;
+  let asset = get_asset_by_exchange(&split_line, "coinbase")?;
+  let quantity = get_quantity_by_exchange(&split_line, "coinbase")?;
+  let price = get_price_by_exchange(&split_line, "coinbase")?;
 
   Ok(Transaction {
     timestamp,
@@ -70,9 +107,59 @@ pub(crate) fn create_transaction_from_line(line: &str) -> Result<Transaction, Bo
 mod tests {
   use super::*;
 
-    fn do_vecs_match<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
+  fn do_vecs_match<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
     let matching = a.iter().zip(b.iter()).filter(|&(a, b)| a == b).count();
     matching == a.len() && matching == b.len()
+  }
+
+  #[test]
+  fn test_get_action_by_exchange() {
+    let test_data = vec!["2018-01-23T03:40:11Z","Buy","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let expected_result = TransactionType::Buy;
+
+    let my_action = get_action_by_exchange(&test_data, "coinbase").unwrap();
+
+    assert_eq!(my_action, expected_result);
+  }
+
+  #[test]
+  fn test_get_timestamp_by_exchange() {
+    let test_data = vec!["2018-01-23T03:40:11Z","Buy","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let expected_result = 1516678811000;
+
+    let my_timestamp = get_timestamp_by_exchange(&test_data, "coinbase").unwrap();
+
+    assert_eq!(my_timestamp, expected_result);
+  }
+
+  #[test]
+  fn test_get_asset_by_exchange() {
+    let test_data = vec!["2018-01-23T03:40:11Z","Buy","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let expected_result = "BTC";
+
+    let my_asset = get_asset_by_exchange(&test_data, "coinbase").unwrap();
+
+    assert_eq!(my_asset, expected_result);
+  }
+
+  #[test]
+  fn test_get_quantity_by_exchange() {
+    let test_data = vec!["2018-01-23T03:40:11Z","Buy","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let expected_result = 0.000919;
+
+    let my_quantity = get_quantity_by_exchange(&test_data, "coinbase").unwrap();
+
+    assert_eq!(my_quantity, expected_result);
+  }
+
+  #[test]
+  fn test_get_price_by_exchange() {
+    let test_data = vec!["2018-01-23T03:40:11Z","Buy","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let expected_result = 10.00;
+
+    let my_price = get_price_by_exchange(&test_data, "coinbase").unwrap();
+
+    assert_eq!(my_price, expected_result);
   }
 
   #[test]
@@ -107,8 +194,7 @@ mod tests {
 
   #[test]
   fn test_create_transaction_from_line() {
-    let test_line = "2018-01-23T03:40:11Z,Buy,BTC,0.000919,10881.58,10.00,10.00,0.00,Bought 0.000919 BTC for $10.00 USD";
-
+    let test_string = "2018-01-23T03:40:11Z,Buy,BTC,0.000919,10881.58,10.00,10.00,0.00,Bought 0.000919 BTC for $10.00 USD";
     let expected_result = Transaction {
       timestamp: 1516678811000,
       action: TransactionType::Buy,
@@ -117,7 +203,7 @@ mod tests {
       price: 10.00
     };
 
-    let transaction = create_transaction_from_line(&test_line).unwrap();
+    let transaction = create_transaction_from_line(&test_string).unwrap();
 
     assert_eq!(transaction.timestamp, expected_result.timestamp);
     assert_eq!(transaction.action, expected_result.action);
