@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::str::FromStr;
+use std::cmp::{PartialEq, PartialOrd, Ord, Ordering};
 
 use chrono::{DateTime};
 use thiserror::Error;
@@ -13,7 +14,7 @@ pub(crate) enum TransactionType {
   Convert
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Transaction {
   pub(crate) timestamp: i64,
   pub(crate) action: TransactionType,
@@ -21,6 +22,20 @@ pub(crate) struct Transaction {
   pub(crate) quantity: f64,
   pub(crate) price: f64,
   pub(crate) conversion_to: Option<String>
+}
+
+impl Eq for Transaction {}
+
+impl PartialOrd for Transaction {
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    self.timestamp.partial_cmp(&other.timestamp)
+  }
+}
+
+impl Ord for Transaction {
+  fn cmp(&self, other: &Self) -> Ordering {
+    self.timestamp.cmp(&other.timestamp)
+  }
 }
 
 #[derive(Error, Debug, PartialEq)]
