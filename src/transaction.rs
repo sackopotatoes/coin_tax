@@ -15,13 +15,19 @@ pub(crate) enum TransactionType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub(crate) struct CoinConversion {
+  name: String,
+  quantity: f64
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Transaction {
   pub(crate) timestamp: i64,
   pub(crate) action: TransactionType,
   pub(crate) asset: String,
   pub(crate) quantity: f64,
   pub(crate) price: f64,
-  pub(crate) conversion_to: Option<String>
+  pub(crate) conversion_to: Option<CoinConversion>
 }
 
 impl Eq for Transaction {}
@@ -96,12 +102,15 @@ fn get_price_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, T
   }
 }
 
-fn get_conversion_to_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<Option<String>, TransactionError> {
+fn get_conversion_to_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<Option<CoinConversion>, TransactionError> {
     match exchange {
     "coinbase" => {
       let note_data: Vec<&str> = line_data.last().unwrap().split(" ").collect::<Vec<&str>>();
 
-      Ok(Some(String::from(*note_data.last().unwrap())))
+      Ok(Some(CoinConversion {
+        name: String::from(*note_data.last().unwrap()),
+        quantity: f64::from_str(note_data[note_data.len() - 2])?
+      }))
     },
     _ => Err(TransactionError::UnsupportedExchange)
   }
@@ -230,7 +239,10 @@ mod tests {
   #[test]
   fn test_get_conversion_to_by_exchange() {
     let test_data = vec!["2021-01-31T05:20:47Z","Convert","XLM","1641.4065951","0.310000","505.34","515.01","9.67","Converted 1,641.4065951 XLM to 774.762752 ALGO"];
-    let expected_result = Some(String::from("ALGO"));
+    let expected_result = Some(CoinConversion {
+      name: String::from("ALGO"),
+      quantity: 774.762752
+    });
 
     let my_conversion_to = get_conversion_to_by_exchange(&test_data, "coinbase").unwrap();
     let my_unsupported_exchange = get_price_by_exchange(&test_data, "coinfake").unwrap_err();
