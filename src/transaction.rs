@@ -4,7 +4,7 @@ use std::str::FromStr;
 use chrono::{DateTime};
 use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[derive(PartialEq)]
 pub(crate) enum TransactionType {
   Buy,
@@ -13,7 +13,7 @@ pub(crate) enum TransactionType {
   Convert
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Transaction {
   pub(crate) timestamp: i64,
   pub(crate) action: TransactionType,
