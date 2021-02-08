@@ -8,14 +8,6 @@ mod transaction;
 
 //TODO: build coin buckets
 
-pub fn get_filename() -> Result<String, Box<dyn Error>> {
-    let args: Vec<String> = std::env::args().collect();
-
-    let filename = args[1].clone();
-
-    Ok(filename)
-}
-
 fn read_lines<P>(filename: P) -> io::Result<std::iter::Enumerate<io::Lines<io::BufReader<File>>>>
 where P: AsRef<Path>, {
     let file = File::open(filename)?;
@@ -59,7 +51,13 @@ pub fn run(filename: &str, exchange: &str) -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod lib_tests {
-  // use super::*;
+  use super::*;
 
-
+  #[test]
+  fn test_run() -> Result<(), Box<dyn Error>> {
+    match run("coinbase_test.csv", "coinbase") {
+      Ok(_) => Ok(()),
+      Err(e) => Err(e)
+    }
+  }
 }

@@ -218,8 +218,10 @@ mod tests {
     let expected_result = Some(String::from("ALGO"));
 
     let my_conversion_to = get_conversion_to_by_exchange(&test_data, "coinbase").unwrap();
+    let my_unsupported_exchange = get_price_by_exchange(&test_data, "coinfake").unwrap_err();
 
     assert_eq!(my_conversion_to, expected_result);
+    assert_eq!(my_unsupported_exchange, TransactionError::UnsupportedExchange);
   }
 
   #[test]
