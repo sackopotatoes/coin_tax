@@ -1,3 +1,7 @@
+#![feature(test)]
+
+extern crate test;
+
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -50,6 +54,7 @@ pub fn run(filename: &str, exchange: &str) -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod lib_tests {
   use super::*;
+  use test::Bencher;
 
   #[test]
   fn test_coinbase_run() -> Result<(), Box<dyn Error>> {
@@ -57,5 +62,10 @@ mod lib_tests {
       Ok(_) => Ok(()),
       Err(e) => Err(e)
     }
+  }
+
+  #[bench]
+  fn bench_coinbase_run(b: &mut Bencher) {
+    b.iter(|| run("coinbase_test.csv", "coinbase"))
   }
 }

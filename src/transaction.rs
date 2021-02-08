@@ -108,7 +108,7 @@ fn get_conversion_to_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Resul
       let note_data: Vec<&str> = line_data.last().unwrap().split(" ").collect::<Vec<&str>>();
 
       Ok(Some(CoinConversion {
-        name: String::from(*note_data.last().unwrap()),
+        name: String::from(*note_data.last().unwrap()).replace('"', ""),
         quantity: f64::from_str(note_data[note_data.len() - 2])?
       }))
     },
