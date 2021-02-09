@@ -16,8 +16,8 @@ pub(crate) enum TransactionType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CoinConversion {
-  name: String,
-  quantity: f64
+  pub (crate) name: String,
+  pub (crate) quantity: f32
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -25,8 +25,8 @@ pub(crate) struct Transaction {
   pub(crate) timestamp: i64,
   pub(crate) action: TransactionType,
   pub(crate) asset: String,
-  pub(crate) quantity: f64,
-  pub(crate) price: f64,
+  pub(crate) quantity: f32,
+  pub(crate) price: f32,
   pub(crate) conversion_to: Option<CoinConversion>
 }
 
@@ -88,16 +88,16 @@ fn get_asset_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<String
   }
 }
 
-fn get_quantity_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, TransactionError> {
+fn get_quantity_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f32, TransactionError> {
   match exchange {
-    "coinbase" => Ok(f64::from_str(line_data[3])?),
+    "coinbase" => Ok(f32::from_str(line_data[3])?),
     _ => Err(TransactionError::UnsupportedExchange)
   }
 }
 
-fn get_price_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f64, TransactionError> {
+fn get_price_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f32, TransactionError> {
     match exchange {
-    "coinbase" => Ok(f64::from_str(line_data[6])?),
+    "coinbase" => Ok(f32::from_str(line_data[6])?),
     _ => Err(TransactionError::UnsupportedExchange)
   }
 }
@@ -109,7 +109,7 @@ fn get_conversion_to_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Resul
 
       Ok(Some(CoinConversion {
         name: String::from(*note_data.last().unwrap()).replace('"', ""),
-        quantity: f64::from_str(note_data[note_data.len() - 2])?
+        quantity: f32::from_str(note_data[note_data.len() - 2])?
       }))
     },
     _ => Err(TransactionError::UnsupportedExchange)

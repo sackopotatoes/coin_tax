@@ -7,15 +7,19 @@ use super::transaction;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum PortfolioError {
-  #[error("Error Accessing History")]
-  HistoryAccessError
+  #[error("Error Accessing History for {attempted_access:?}")]
+  HistoryAccessError {
+    attempted_access: String
+  }
 }
+
+type Portfolio = HashMap<String, AssetHistory>;
 
 #[derive(Debug)]
 pub(crate) struct AssetHistory {
   name: String,
   history: Vec<transaction::Transaction>,
-  quantity: f64,
+  quantity: f32,
 }
 
 impl AssetHistory {
@@ -36,7 +40,14 @@ impl AssetHistory {
         self.quantity += new_transaction.quantity;
       },
       transaction::TransactionType::Convert => {
-        self.quantity -= new_transaction.quantity;
+        let conversion = new_transaction.conversion_to.clone().unwrap();
+        
+        if self.name == conversion.name {
+          self.quantity += conversion.quantity;
+        }
+        else {
+          self.quantity -= new_transaction.quantity;
+        }
       }
     }
 
@@ -44,26 +55,38 @@ impl AssetHistory {
   }
 }
 
-
-
-pub(crate) fn add_to_portfolio(mut portfolio: HashMap<String, AssetHistory>, transaction: transaction::Transaction) -> Result<HashMap<String, AssetHistory>, Box<dyn Error>> {
-  if !portfolio.contains_key(&transaction.asset) {
-    let name = transaction.asset.clone();
+fn add_new_asset_to_portfolio(mut portfolio: Portfolio, asset: &str) -> Portfolio {
+  if !portfolio.contains_key(asset) {
     let asset_history = AssetHistory {
-      name,
-      history: Vec::new(),
-      quantity: transaction.quantity
-    };
+        name: String::from(asset),
+        history: Vec::new(),
+        quantity: 0.0
+      };
 
-    portfolio.insert(transaction.asset.clone(), asset_history);
-
-    portfolio.get_mut(&transaction.asset).ok_or(PortfolioError::HistoryAccessError)?.history.push(transaction.clone());
+    portfolio.insert(String::from(asset), asset_history);
   }
-  else {
-    let asset_history = portfolio.get_mut(&transaction.asset).ok_or(PortfolioError::HistoryAccessError)?;
+  
+  portfolio
+}
 
-    asset_history.add_transaction_to_asset(transaction);
+
+pub(crate) fn add_to_portfolio(mut portfolio: Portfolio, transaction: transaction::Transaction) -> Result<Portfolio, Box<dyn Error>> {
+  portfolio = add_new_asset_to_portfolio(portfolio, &transaction.asset);
+
+  // handle update to converted currency
+  if transaction.action == transaction::TransactionType::Convert {
+    let conversion = &transaction.conversion_to.clone().unwrap();
+
+    portfolio = add_new_asset_to_portfolio(portfolio, &conversion.name);
+
+    let coverted_to_asset = portfolio.get_mut(&conversion.name).ok_or(PortfolioError::HistoryAccessError{attempted_access: String::from(&conversion.name)})?;
+
+    coverted_to_asset.add_transaction_to_asset(transaction.clone());
   }
+
+  let asset_history = portfolio.get_mut(&transaction.asset).ok_or(PortfolioError::HistoryAccessError{attempted_access:String::from(&transaction.asset)})?;
+
+  asset_history.add_transaction_to_asset(transaction);
 
   Ok(portfolio)
 }
