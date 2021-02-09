@@ -2,5 +2,5 @@
 **/*.rs.bk
 coin_data.csv
 default.profraw
-output.json
+output.*
 .vscode

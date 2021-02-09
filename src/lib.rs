@@ -4,6 +4,7 @@ extern crate test;
 
 use std::error::Error;
 use std::fs::File;
+use std::io::prelude::*;
 use std::io::{self, BufRead};
 use std::path::Path;
 use std::collections::{HashMap};
@@ -46,7 +47,11 @@ pub fn run(filename: &str, exchange: &str) -> Result<(), Box<dyn Error>> {
 
     println!("{:#?}", portfolio);
 
-    //TODO: start to build coin buckets to calc cost-basis
+    //TODO: start going over assets and finding taxable transactions
+
+    let mut output = File::create(Path::new("output.txt"))?;
+
+    output.write_all(format!("{:#?}", portfolio).as_bytes())?;
 
     Ok(())
 }
