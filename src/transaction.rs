@@ -27,6 +27,7 @@ pub(crate) struct Transaction {
   pub(crate) asset: String,
   pub(crate) quantity: f32,
   pub(crate) price: f32,
+  pub(crate) unit_price: f32,
   pub(crate) conversion_to: Option<CoinConversion>
 }
 
@@ -146,6 +147,7 @@ pub(crate) fn create_transaction_from_line(line: &str, exchange: &str) -> Result
     asset,
     quantity,
     price,
+    unit_price: price/quantity,
     conversion_to
   })
 }
