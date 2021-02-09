@@ -90,3 +90,65 @@ pub(crate) fn add_to_portfolio(mut portfolio: Portfolio, transaction: transactio
 
   Ok(portfolio)
 }
+
+#[cfg(test)]
+mod lib_tests {
+  use transaction::{Transaction, TransactionType};
+  use super::*;
+
+  #[test]
+  fn test_add_new_asset_to_portfolio() {
+    let mut test_portfolio: HashMap<String, AssetHistory> = HashMap::new();
+
+    let asset_to_add = "BTC";
+
+    test_portfolio = add_new_asset_to_portfolio(test_portfolio, asset_to_add);
+
+    assert!(test_portfolio.contains_key(asset_to_add))
+  }
+
+  #[test]
+  fn test_asset_history_push_into_history() {
+    let mut test_asset = AssetHistory {
+      name: String::from("BTC"),
+      quantity: 0.0,
+      history: Vec::new()
+    };
+
+    let test_transaction = Transaction {
+      timestamp: 123456789,
+      asset: String::from("BTC"),
+      action: TransactionType::Sell,
+      price: 10.0,
+      quantity: 0.123,
+      conversion_to: None
+    };
+
+    test_asset.push_into_history(test_transaction);
+
+    assert!(test_asset.history.len() == 1);
+  }
+
+  #[test]
+  fn test_add_transaction_to_asset() {
+    let mut test_asset = AssetHistory {
+      name: String::from("BTC"),
+      quantity: 0.0,
+      history: Vec::new()
+    };
+
+    let test_transaction = Transaction {
+      timestamp: 123456789,
+      asset: String::from("BTC"),
+      action: TransactionType::Sell,
+      price: 10.0,
+      quantity: 0.123,
+      conversion_to: None
+    };
+
+    test_asset.add_transaction_to_asset(test_transaction);
+
+    assert_eq!(test_asset.quantity, -0.123);
+    assert_eq!(test_asset.history.len(), 1);
+  }
+}
