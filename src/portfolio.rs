@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::collections::{HashMap};
+use std::collections::{HashMap, VecDeque};
 
 use thiserror::Error;
 
@@ -18,11 +18,19 @@ type Portfolio = HashMap<String, AssetHistory>;
 #[derive(Debug)]
 pub(crate) struct AssetHistory {
   name: String,
-  history: Vec<transaction::Transaction>,
+  history: VecDeque<transaction::Transaction>,
   quantity: f32,
 }
 
 impl AssetHistory {
+  fn new(asset_name: &str) -> AssetHistory {
+    AssetHistory {
+      name: String::from(asset_name),
+      history: VecDeque::new(),
+      quantity: 0.0
+    }
+  }
+
   fn push_into_history(&mut self, new_transaction: transaction::Transaction) {
     let pos = self.history.binary_search(&new_transaction).unwrap_or_else(|e| e);
     self.history.insert(pos, new_transaction);
@@ -57,11 +65,7 @@ impl AssetHistory {
 
 fn add_new_asset_to_portfolio(mut portfolio: Portfolio, asset: &str) -> Portfolio {
   if !portfolio.contains_key(asset) {
-    let asset_history = AssetHistory {
-        name: String::from(asset),
-        history: Vec::new(),
-        quantity: 0.0
-      };
+    let asset_history = AssetHistory::new(asset);
 
     portfolio.insert(String::from(asset), asset_history);
   }
@@ -109,11 +113,7 @@ mod lib_tests {
 
   #[test]
   fn test_asset_history_push_into_history() {
-    let mut test_asset = AssetHistory {
-      name: String::from("BTC"),
-      quantity: 0.0,
-      history: Vec::new()
-    };
+    let mut test_asset = AssetHistory::new("BTC");
 
     let test_transaction = Transaction::new(
       123456789,
@@ -132,11 +132,7 @@ mod lib_tests {
 
   #[test]
   fn test_add_transaction_to_asset() {
-    let mut test_asset = AssetHistory {
-      name: String::from("BTC"),
-      quantity: 0.0,
-      history: Vec::new()
-    };
+    let mut test_asset = AssetHistory::new("BTC");
 
     let test_transaction = Transaction::new(
       123456789,
@@ -150,7 +146,7 @@ mod lib_tests {
 
     test_asset.add_transaction_to_asset(test_transaction);
 
-    assert_eq!(test_asset.quantity, -0.123);
+    assert_eq!(test_asset.quantity, -10.0);
     assert_eq!(test_asset.history.len(), 1);
   }
 }

@@ -1,4 +1,5 @@
 #![feature(test)]
+#![feature(vecdeque_binary_search)]
 // for benchmarking
 // extern crate test;
 
