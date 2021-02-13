@@ -115,14 +115,15 @@ mod lib_tests {
       history: Vec::new()
     };
 
-    let test_transaction = Transaction {
-      timestamp: 123456789,
-      asset: String::from("BTC"),
-      action: TransactionType::Sell,
-      price: 10.0,
-      quantity: 0.123,
-      conversion_to: None
-    };
+    let test_transaction = Transaction::new(
+      123456789,
+      TransactionType::Sell,
+      String::from("BTC"),
+      10.0,
+      0.123,
+      10881.58,
+      None
+    );
 
     test_asset.push_into_history(test_transaction);
 
@@ -137,14 +138,15 @@ mod lib_tests {
       history: Vec::new()
     };
 
-    let test_transaction = Transaction {
-      timestamp: 123456789,
-      asset: String::from("BTC"),
-      action: TransactionType::Sell,
-      price: 10.0,
-      quantity: 0.123,
-      conversion_to: None
-    };
+    let test_transaction = Transaction::new(
+      123456789,
+      TransactionType::Sell,
+      String::from("BTC"),
+      10.0,
+      0.123,
+      10881.58,
+      None
+    );
 
     test_asset.add_transaction_to_asset(test_transaction);
 

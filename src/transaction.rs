@@ -27,8 +27,26 @@ pub(crate) struct Transaction {
   pub(crate) asset: String,
   pub(crate) quantity: f32,
   pub(crate) price: f32,
+  pub(crate) fair_market_value: f32,
   pub(crate) unit_price: f32,
   pub(crate) conversion_to: Option<CoinConversion>
+}
+
+impl Transaction {
+  pub(crate) fn new(timestamp: i64, action: TransactionType, asset: String, quantity: f32, price: f32, fair_market_value: f32, conversion_to: Option<CoinConversion>) -> Transaction {
+    let unit_price = price/quantity;
+
+    Transaction {
+      timestamp,
+      action,
+      asset,
+      quantity,
+      price,
+      fair_market_value,
+      unit_price,
+      conversion_to
+    }
+  }
 }
 
 impl Eq for Transaction {}
@@ -103,6 +121,13 @@ fn get_price_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f32, T
   }
 }
 
+fn get_fair_market_value_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<f32, TransactionError> {
+  match exchange {
+    "coinbase" => Ok(f32::from_str(line_data[4])?),
+    _ => Err(TransactionError::UnsupportedExchange)
+  }
+}
+
 fn get_conversion_to_by_exchange(line_data: &Vec<&str>, exchange: &str) -> Result<Option<CoinConversion>, TransactionError> {
     match exchange {
     "coinbase" => {
@@ -135,21 +160,22 @@ pub(crate) fn create_transaction_from_line(line: &str, exchange: &str) -> Result
   let asset = get_asset_by_exchange(&split_line, &exchange)?;
   let quantity = get_quantity_by_exchange(&split_line, &exchange)?;
   let price = get_price_by_exchange(&split_line, &exchange)?;
+  let fair_market_value = get_fair_market_value_by_exchange(&split_line, &exchange)?;
   let mut conversion_to = None;
 
   if action == TransactionType::Convert {
     conversion_to = get_conversion_to_by_exchange(&split_line, &exchange)?;
   }
 
-  Ok(Transaction {
+  Ok(Transaction::new(
     timestamp,
     action,
     asset,
     quantity,
     price,
-    unit_price: price/quantity,
+    fair_market_value,
     conversion_to
-  })
+  ))
 }
 
 #[cfg(test)]
@@ -239,6 +265,18 @@ mod tests {
   }
 
   #[test]
+  fn test_get_fair_market_value_by_exchange() {
+    let test_data = vec!["2018-01-23T03:40:11Z","Buy","BTC","0.000919","10881.58","10.00","10.00","0.00","Bought 0.000919 BTC for $10.00 USD"];
+    let expected_result = 10881.58;
+
+    let my_fair_market_value = get_fair_market_value_by_exchange(&test_data, "coinbase").unwrap();
+    let my_unsupported_exchange = get_fair_market_value_by_exchange(&test_data, "coinfake").unwrap_err();
+
+    assert_eq!(my_fair_market_value, expected_result);
+    assert_eq!(my_unsupported_exchange, TransactionError::UnsupportedExchange);
+  }
+
+  #[test]
   fn test_get_conversion_to_by_exchange() {
     let test_data = vec!["2021-01-31T05:20:47Z","Convert","XLM","1641.4065951","0.310000","505.34","515.01","9.67","Converted 1,641.4065951 XLM to 774.762752 ALGO"];
     let expected_result = Some(CoinConversion {
@@ -286,14 +324,15 @@ mod tests {
   #[test]
   fn test_create_transaction_from_line() {
     let test_string = "2018-01-23T03:40:11Z,Buy,BTC,0.000919,10881.58,10.00,10.00,0.00,Bought 0.000919 BTC for $10.00 USD";
-    let expected_result = Transaction {
-      timestamp: 1516678811000,
-      action: TransactionType::Buy,
-      asset: String::from("BTC"),
-      quantity: 0.000919,
-      price: 10.00,
-      conversion_to: None
-    };
+    let expected_result = Transaction::new (
+      1516678811000,
+      TransactionType::Buy,
+      String::from("BTC"),
+      0.000919,
+      10.00,
+      10881.58,
+      None
+    );
 
     let transaction = create_transaction_from_line(&test_string, "coinbase").unwrap();
 
